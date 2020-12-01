@@ -18,6 +18,13 @@ def rm_ext_and_nan(CTG_features, extra_feature):
     """
     # ------------------ IMPLEMENT YOUR CODE HERE:------------------------------
 
+    ctg = CTG_features.drop(extra_feature, axis=1)
+    c_ctg = ctg.to_dict(orient='series')
+
+    for key in c_ctg.keys():
+        c_ctg[key] = c_ctg[key].apply(pd.to_numeric, errors='coerce')
+        c_ctg[key] = c_ctg[key].dropna()
+
     # --------------------------------------------------------------------------
     return c_ctg
 
@@ -31,7 +38,19 @@ def nan2num_samp(CTG_features, extra_feature):
     """
     c_cdf = {}
     # ------------------ IMPLEMENT YOUR CODE HERE:------------------------------
+    c_cdf = CTG_features.drop(extra_feature, axis=1)  # remove 'DR' feature
+    c_cdf = c_cdf.to_dict(orient='series')
 
+    for key in c_cdf.keys():  # for every column, seperately
+        c_cdf[key] = pd.to_numeric(c_cdf[key], errors='coerce')  # replace non-numeric values with NaN
+        probs = c_cdf[key].value_counts(normalize=True)  # calculate the probability of each element in the column
+        new_vals = []
+        for value in c_cdf[key]:
+            if np.isnan(value):
+                new_vals.append(np.random.choice(list(probs.keys()), p=list(probs.values)))  # if value=NaN -> replace it using the requested function
+            else:
+                new_vals.append(value)  # if value is numeric -> keep it
+        c_cdf[key] = new_vals
     # -------------------------------------------------------------------------
     return pd.DataFrame(c_cdf)
 
@@ -43,7 +62,13 @@ def sum_stat(c_feat):
     :return: Summary statistics as a dicionary of dictionaries (called d_summary) as explained in the notebook
     """
     # ------------------ IMPLEMENT YOUR CODE HERE:------------------------------
+    d_summary = {}
 
+    for key in c_feat.keys():
+        stats = c_feat[key].describe()
+        rel_stat = stats[3:]
+        rel_stat = rel_stat.to_dict()
+        d_summary[key] = rel_stat
     # -------------------------------------------------------------------------
     return d_summary
 
@@ -57,7 +82,21 @@ def rm_outlier(c_feat, d_summary):
     """
     c_no_outlier = {}
     # ------------------ IMPLEMENT YOUR CODE HERE:------------------------------
-
+    tmp_dict = c_feat.to_dict(orient='series')
+    for key in tmp_dict.keys():  # for every column, seperately
+        no_outliers = []
+        # statistical calculations
+        Q1 = d_summary[key]['25%']
+        Q3 = d_summary[key]['75%']
+        IQR = Q3 - Q1
+        low_val = Q1 - 1.5 * IQR
+        high_val = Q3 + 1.5 * IQR
+        for value in tmp_dict[key]:  # for every value in the column
+            if value >= low_val and value <= high_val:
+                no_outliers.append(value)
+            else:
+                no_outliers.append(np.nan)
+        c_no_outlier[key] = no_outliers
     # -------------------------------------------------------------------------
     return pd.DataFrame(c_no_outlier)
 
@@ -71,7 +110,11 @@ def phys_prior(c_cdf, feature, thresh):
     :return: An array of the "filtered" feature called filt_feature
     """
     # ------------------ IMPLEMENT YOUR CODE HERE:-----------------------------
-
+    filt_feature = []
+    feature_vals = c_cdf[feature]
+    for val in feature_vals:
+        if val <= thresh:
+            filt_feature.append(val)
     # -------------------------------------------------------------------------
     return filt_feature
 
@@ -87,6 +130,50 @@ def norm_standard(CTG_features, selected_feat=('LB', 'ASTV'), mode='none', flag=
     """
     x, y = selected_feat
     # ------------------ IMPLEMENT YOUR CODE HERE:------------------------------
+    nsd_res = {}
+    # Standardization and Normalization of the data
+    for key in CTG_features.keys():  # for every column sepparately
+        new_norm_vals = []
+        mean = np.mean(CTG_features[key])  # the mean of each series
+        std = np.std(CTG_features[key])  # the std of each series
+        min = np.min(CTG_features[key])  # the min of each series
+        max = np.max(CTG_features[key])  # the max of each series
+
+        if mode == 'standard':
+            for val in CTG_features[key]:  # normalize each value in the specific column
+                norm_val = (val - mean) / std
+                new_norm_vals.append(norm_val)
+            nsd_res[key] = new_norm_vals
+
+        elif mode == 'MinMax':
+            for val in CTG_features[key]:  # normalize each value in the specific column
+                norm_val = (val - min) / (max - min)
+                new_norm_vals.append(norm_val)
+            nsd_res[key] = new_norm_vals
+
+        elif mode == 'mean':
+            for val in CTG_features[key]:  # normalize each value in the specific column
+                norm_val = (val - mean) / (max - min)
+                new_norm_vals.append(norm_val)
+            nsd_res[key] = new_norm_vals
+
+        else:
+            nsd_res[key] = CTG_features[key]
+
+    # Statistical and graphical comparison of the normalized and original data
+    if flag == True:
+
+        plt.hist(nsd_res[x], bins=120)  # histograms of the scaled data
+        plt.xlabel(x)
+        plt.ylabel('Count')
+        plt.title('Histogram of the scaled ' + x + ' data feature with selected mode = ' + mode)
+        plt.show()
+
+        plt.hist(nsd_res[y], bins=120)  # histograms of the scaled data
+        plt.xlabel(y)
+        plt.ylabel('Count')
+        plt.title('Histogram of the scaled ' + y + ' data feature with selected mode = ' + mode)
+        plt.show()
 
     # -------------------------------------------------------------------------
     return pd.DataFrame(nsd_res)

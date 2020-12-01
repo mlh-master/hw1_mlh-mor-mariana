@@ -19,7 +19,13 @@ def pred_log(logreg, X_train, y_train, X_test, flag=False):
     :return: A two elements tuple containing the predictions and the weightning matrix
     """
     # ------------------ IMPLEMENT YOUR CODE HERE:-----------------------------
-
+    logreg.fit(X_train, y_train)
+    # y_train_pred = logreg.predict(X_train)
+    w_log = logreg.coef_
+    if flag == True:
+        y_pred_log = logreg.predict_proba(X_test)
+    else:
+        y_pred_log = logreg.predict(X_test)
     # -------------------------------------------------------------------------
     return y_pred_log, w_log
 
@@ -83,7 +89,18 @@ def cv_kfold(X, y, C, penalty, K, mode):
             for train_idx, val_idx in kf.split(X, y):
                 x_train, x_val = X.iloc[train_idx], X.iloc[val_idx]
         # ------------------ IMPLEMENT YOUR CODE HERE:-----------------------------
-
+                y_train, y_val = y[train_idx], y[val_idx]
+                x_train_norm = nsd(x_train, mode=mode, flag=False)
+                x_val_norm = nsd(x_val, mode=mode, flag=False)
+                # x_train = scaler.fit_transform(x_train)
+                # x_val = scaler.transform(x_val)
+                y_pred_val, w_pred = pred_log(logreg, x_train_norm, y_train, x_val_norm, flag=True)
+                loss_val_vec[k] = log_loss(y_val, y_pred_val)
+                k += 1
+            mu = np.mean(loss_val_vec)
+            sigma = np.std(loss_val_vec)
+            sub_dict = {"C": c, "penalty": p, "mu": mu, "sigma": sigma}
+            validation_dict.append(sub_dict)
         # --------------------------------------------------------------------------
     return validation_dict
 
@@ -98,7 +115,15 @@ def odds_ratio(w, X, selected_feat='LB'):
              odds_ratio: the odds ratio of the selected feature and label
     """
     # ------------------ IMPLEMENT YOUR CODE HERE:-----------------------------
-
+    feat_idx = np.where(X.keys() == selected_feat)
+    odd_ratio = np.exp(w[0, feat_idx])[0, 0]  # for "Normal" option
+    w_log_normal_T = np.transpose(w[0, :])  # for "Normal" option
+    rows = np.array(list(range(0, len(X))))  # start from 0 or 1?
+    odds_list = []
+    for row in rows:
+        row_odds = np.exp(w_log_normal_T @ X.iloc[row, :])
+        odds_list.append(row_odds)
+    odds = np.median(odds_list)
     # --------------------------------------------------------------------------
 
     return odds, odd_ratio
